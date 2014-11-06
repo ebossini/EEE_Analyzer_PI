@@ -13,7 +13,7 @@ E3Run::~E3Run(void)
 
 void E3Run::analyzeRun(std::string Source,std::string OutDir)
 {
-	_sourceStream.open(Source,std::ios::binary);
+  _sourceStream.open(Source.c_str(),std::ios::binary);
 
 	//get file size
     _sourceStream.seekg (0, _sourceStream.end);
@@ -151,25 +151,25 @@ bool E3Run::createOutFile(std::string OutDir)
 	fileName=OutDir;
 	fileName.append(_hRunName);
 	fileName.append(".tim");	
-	_timFile.open(fileName);
+	_timFile.open(fileName.c_str());
 
 	fileName.clear();
 	fileName=OutDir;
 	fileName.append(_hRunName);
 	fileName.append(".out");	
-	_outFile.open(fileName);
+	_outFile.open(fileName.c_str());
 
 	fileName.clear();
 	fileName=OutDir;
 	fileName.append(_hRunName);
 	fileName.append(".2tt");	
-	_2ttFile.open(fileName);
+	_2ttFile.open(fileName.c_str());
 
 	fileName.clear();
 	fileName=OutDir;
 	fileName.append(_hRunName);
 	fileName.append(".sum");
-	_sumFile.open(fileName);
+	_sumFile.open(fileName.c_str());
 
 	if (_timFile.good() && _2ttFile.good() && _sumFile.good() && _outFile.good()) return true;
 	else
