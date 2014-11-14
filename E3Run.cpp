@@ -13,7 +13,7 @@ E3Run::~E3Run(void)
 
 void E3Run::analyzeRun(std::string Source,std::string OutDir)
 {
-  _sourceStream.open(Source.c_str(),std::ios::binary);
+  _sourceStream.open(Source.c_str(), std::ios::binary);
 
 	//get file size
     _sourceStream.seekg (0, _sourceStream.end);
@@ -25,7 +25,12 @@ void E3Run::analyzeRun(std::string Source,std::string OutDir)
 	// header parsing (contains gps inforamtion)
 
 	t_gps EEE_gps;
-	_sourceStream.read((char*)&_hH,			sizeof(_hH)				);
+	do
+	{
+		_sourceStream.read((char*)&_hH,			sizeof(_hH)				);  //fix for standard EEE header
+		//std::cout<< "Found "<<_hH<<std::endl;
+	} while (_hH!=0xfbfbfbfb && (_sourceStream.tellg()<FileLength));
+
 	_sourceStream.read((char*)&_hVersion,	sizeof(_hVersion)		);
 	_sourceStream.read((char*)&_hMachineID,	sizeof(_hMachineID)		);
 	_sourceStream.read((char*)&_hRunNumber,	sizeof(_hRunNumber)		);
@@ -90,7 +95,7 @@ void E3Run::analyzeRun(std::string Source,std::string OutDir)
 			_gSumMultiplicity.at(_event.multiplicity[0]+_event.multiplicity[1]+_event.multiplicity[2])++;
 
 			writeEventTim(_timFile);
-			if (_event.trkNum==1) writeEventOut(_outFile);
+			writeEventOut(_outFile);
 		}
 	}
 		_sourceStream.close();
@@ -204,6 +209,8 @@ std::ostream& E3Run::writeEventTim(std::ostream& os)
 
 std::ostream& E3Run::writeEventOut(std::ostream& os)
 {
+
+
 	//run number from header
 	os.width(6);
 	os << std::fixed<<std::dec<<std::right<<_hRunNumber;
@@ -211,6 +218,16 @@ std::ostream& E3Run::writeEventOut(std::ostream& os)
 	//event number(corrected for 1 event offset)
 	os.width(11);		
 	os << _event.getEvtNum()-1;
+
+
+
+	if (_event.trkNum==0)  // if no tracks are reconstructed,write it and return
+	{
+		os.width(11);
+		os <<"no hits"<<std::endl;
+		return os;
+	}
+
 
 	//seconds from 1.1.2007
 	os.width(11);

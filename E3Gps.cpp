@@ -74,8 +74,8 @@ std::ostream&  E3Gps::writeGpsInfo(std::ostream& os)
 	os 	<< "Quality		= " <<std::dec<< (int)_gpsStruct.quality<<std::endl
 		<< "UTC Date	= " << _gpsStruct.UTCdate<<std::endl
 		<< "UTC Time	= " << _gpsStruct.UTCtime <<std::endl
-		<< "Latitude	= " << _gpsStruct.latitude <<std::endl
-		<< "Longitude	= " << _gpsStruct.longitude<<std::endl
+		<< "Latitude	= " << (UInt_32b)(_gpsStruct.latitude/100) + ((fmod(_gpsStruct.latitude,100)/60)) <<std::endl
+		<< "Longitude	= " << (UInt_32b)(_gpsStruct.longitude/100) + ((fmod(_gpsStruct.longitude,100)/60)) <<std::endl
 		<< "EEE time	= " << _gpsE3Timestamp<<std::endl
 	 	<< "GPGGA		= " << _gpsStruct.gpgga_str<<std::endl
 		<< "GPRMC		= " << _gpsStruct.gprmc_str<<std::endl<<std::endl;

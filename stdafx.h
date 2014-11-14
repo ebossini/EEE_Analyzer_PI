@@ -10,10 +10,9 @@
 #include <stdio.h>
 #include <vector> 
 #include <stdint.h>
-#include <math.h>
-//#include <tchar.h>
 #include <iostream>
 #include <fstream>
+#include <math.h>
 #include <string.h> 
 #include <time.h> 
 #include <iomanip>      // std::setprecision

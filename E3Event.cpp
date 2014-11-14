@@ -160,7 +160,7 @@ void E3Event::compute_time(int plus, int minus, int plane)
 			if (plane==1) time_diff[i][plane]+= 4250;																		
 			 //printf("plane %d channel %d time %f ps\n",plane,i,time_diff[i][plane]);
 			coinc[i][plane]=3;
-			double planeDist[3]={120,80,40};
+			double planeDist[3]={149,96,43};
 			Zcoord[g_multiplicity]=planeDist[plane];
 			Ycoord[g_multiplicity]=time_diff[i][plane]/1000;																		
 			Xcoord[g_multiplicity]=(float)i;																		
