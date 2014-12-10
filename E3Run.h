@@ -17,7 +17,7 @@ private:
 	std::ofstream _sumFile;
 
 	E3Gps	_gps;
-	E3Event _event;
+	E3RecoEvent _event;
 
 	//run header info
 	
@@ -33,16 +33,22 @@ private:
 
 	//run sum
 	UInt_32b _analyzed;										//events correctly analyzed
-	std::vector<std::vector<UInt_32b> >  _gMultiplicity;	//hits multiplicity for each chamber
-	std::vector<UInt_32b>  _gSumMultiplicity;				//hits multiplicity for each event
-	UInt_32b	_gLowMultiplicity;							//events with AT LEAST one empty chamber
-	UInt_32b	_gMediumMultiplicity;						//events with 1 or 2 hit/chamber
-	UInt_32b	_gHighMultiplicity;							//events with at least one chamber with hit multiplicity > 2
 
+	std::vector<std::vector<UInt_32b> >  _gHitMult;	//hits multiplicity for each chamber
+	std::vector<UInt_32b>  _gSumHitMult;				//hits multiplicity for each event
+	UInt_32b	_gLowHitMult;							//events with AT LEAST one empty chamber
+	UInt_32b	_gMediumHitMult;						//events with 1 or 2 hit/chamber
+	UInt_32b	_gHighHitMult;							//events with at least one chamber with hit multiplicity > 2
 
+	std::vector<std::vector<UInt_32b> >  _gClusterMult;		//cluster multiplicity for each chamber
+	std::vector<UInt_32b>  _gSumClusterMult;				//cluster multiplicity for each event
+	UInt_32b	_gLowClusterMult;							//events with AT LEAST one empty chamber
+	UInt_32b	_gMediumClusterMult;						//events with 1 or 2 cluster/chamber
+	UInt_32b	_gHighClusterMult;							//events with at least one chamber with cluster multiplicity > 2
 	
 	bool createOutFile(std::string OutDir);
 	UInt_16b getEvent();
+	void getMultiplicity();
 
 
 public:
@@ -52,8 +58,6 @@ public:
 	
 	void analyzeRun(std::string Source,std::string OutDir);
 
-	//call to event class
-	inline UInt_16b analyzeEvent()	{return _event.analyzeEvent();};
 
 
 	//call to gps class

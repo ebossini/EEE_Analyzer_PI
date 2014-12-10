@@ -2,8 +2,16 @@
 #include "E3Run.h"
 
 
-E3Run::E3Run(void):_gps(),_gMultiplicity(3,std::vector< UInt_32b>(1000,0)),_gSumMultiplicity(3000,0)
+E3Run::E3Run(void):_gps(),_gHitMult(3,std::vector< UInt_32b>(1000,0)),_gSumHitMult(3000,0),
+		_gClusterMult(3,std::vector< UInt_32b>(1000,0)),_gSumClusterMult(3000,0)
 {
+	
+	_gLowHitMult=0;
+	_gMediumHitMult=0;
+	_gHighHitMult=0;
+	_gLowClusterMult=0;
+	_gMediumClusterMult=0;
+	_gHighClusterMult=0;
 }
 
 
@@ -13,7 +21,7 @@ E3Run::~E3Run(void)
 
 void E3Run::analyzeRun(std::string Source,std::string OutDir)
 {
-  _sourceStream.open(Source.c_str(), std::ios::binary);
+	_sourceStream.open(Source.c_str(),std::ios::binary);
 
 	//get file size
     _sourceStream.seekg (0, _sourceStream.end);
@@ -25,6 +33,8 @@ void E3Run::analyzeRun(std::string Source,std::string OutDir)
 	// header parsing (contains gps inforamtion)
 
 	t_gps EEE_gps;
+	E3Track bestTrack;
+
 	do
 	{
 		_sourceStream.read((char*)&_hH,			sizeof(_hH)				);  //fix for standard EEE header
@@ -41,6 +51,9 @@ void E3Run::analyzeRun(std::string Source,std::string OutDir)
 	_sourceStream.read((char*)&_hStartTime,	sizeof(_hStartTime)		);
 	_sourceStream.read((char*)&EEE_gps,		sizeof(t_gps)			);
 	_sourceStream.read((char*)&_hT,			sizeof(_hT)				);
+
+	//set event gps timestamp
+	_event.setGpsTimestamp(getGpsE3Timestamp());
 
 	//print Header Info
 
@@ -65,41 +78,41 @@ void E3Run::analyzeRun(std::string Source,std::string OutDir)
 
 	_event.setNinoMap(_hNinoMap);
 	_analyzed=0;
-	_gLowMultiplicity=0;
-	_gMediumMultiplicity=0;
-	_gHighMultiplicity=0;
-	
+	int GoodEvent=0;
+	int trackfound=0;
 	while (_sourceStream.tellg()<FileLength)
 	{
+		_event.clear();
 		if(getEvent()==1)
 		{
 			std::cout<<"Event stream: unexpected fail to read file"<<std::endl;
 			break;
 		}
-		if(analyzeEvent()==0)
+		
+		if(_event.unpack()==0)
 		{
-			_analyzed++;
-			for (UInt_16b ChamberIdx=0;ChamberIdx<3;ChamberIdx++)
+			if(_event.reconstruct()==0)
 			{
-				_gMultiplicity.at(ChamberIdx).at(_event.multiplicity[ChamberIdx])++;
+				_analyzed++;
+				bestTrack=_event.bestTrack();
+				getMultiplicity();
+				if(_event.numTracks())
+				{
+					trackfound++;
+					if(bestTrack.chisquare()<10)	GoodEvent++;
+
+				}
+				
+				//write event
+				writeEventTim(_timFile);
+				writeEventOut(_outFile);
 			}
-			if (_event.multiplicity[0]==0 || _event.multiplicity[1]==0 || _event.multiplicity[2]==0) _gLowMultiplicity++;
-
-			if ((_event.multiplicity[0]==1 || _event.multiplicity[0]==2)  &&  
-				(_event.multiplicity[1]==1 || _event.multiplicity[1]==2)  &&
-				(_event.multiplicity[2]==1 || _event.multiplicity[2]==2)) _gMediumMultiplicity++;
-
-			if (_event.multiplicity[0]>2 || _event.multiplicity[1]>2 || _event.multiplicity[2]>2) _gHighMultiplicity++;
-
-
-			_gSumMultiplicity.at(_event.multiplicity[0]+_event.multiplicity[1]+_event.multiplicity[2])++;
-
-			writeEventTim(_timFile);
-			writeEventOut(_outFile);
 		}
 	}
 		_sourceStream.close();
-
+		/*std::cout<<GoodEvent<<std::endl;
+		std::cout<<trackfound<<std::endl;
+		std::cout<<_analyzed<<std::endl;*/
 		writeRunSum(_sumFile);
 
 		_timFile.close();
@@ -108,26 +121,48 @@ void E3Run::analyzeRun(std::string Source,std::string OutDir)
 		_2ttFile.close();
 
 }
+void E3Run::getMultiplicity()
+{
+	for (UInt_16b ChamberIdx=0;ChamberIdx<3;ChamberIdx++)
+	{
+		_gHitMult.at(ChamberIdx).at(_event.numHits(ChamberIdx))++;          //chamber hit multiplicity
+		_gClusterMult.at(ChamberIdx).at(_event.numClusters(ChamberIdx))++;	//chamber cluster multiplicity
+	}
+	if (_event.numHits(0)==0 || _event.numHits(1)==0 || _event.numHits(2)==0) _gLowHitMult++; //at least 1 chamber with no hits
+	if (_event.numClusters(0)==1 && _event.numClusters(1)==1 && _event.numClusters(2)==1) _gLowClusterMult++;  //1 cluster in each chamber
+	
+	if ((_event.numHits(0)==1 || _event.numHits(0)==2)  &&  
+		(_event.numHits(1)==1 || _event.numHits(1)==2)  &&
+		(_event.numHits(2)==1 || _event.numHits(2)==2)) _gMediumHitMult++;   //events with 1/2 hits in each chamber
+	if ((_event.numClusters(0)==2)  &&  
+		(_event.numClusters(1)==2)  &&
+		(_event.numClusters(2)==2)) _gMediumClusterMult++; //events with 2 clusters in each chamber
+	
+	if (_event.numHits(0)>2 || _event.numHits(1)>2 || _event.numHits(2)>2) _gHighHitMult++;			//at least one chambers with more than 2 hits
+	if (_event.numClusters(0)>2 || _event.numClusters(1)>2 || _event.numClusters(2)>2) _gHighClusterMult++;//at least one chambers with more than 2 cluster
+
+	_gSumHitMult.at(_event.numHits())++;
+	_gSumClusterMult.at(_event.numClusters())++;
+}
 
 UInt_16b E3Run::getEvent()
 {
 
 	UInt_16b nword[2];
 	UInt_64b time;
-	UInt_32b data[2][2048];
+	UInt_32b word;
 	
 	_sourceStream.read((char*)&time,sizeof(time));
-	_sourceStream.read((char*)nword,sizeof(nword[0])*2);	
-	_sourceStream.read((char*)data[0],sizeof(UInt_32b)*nword[0]);	
-	if((_sourceStream.read((char*)data[1],sizeof(UInt_32b)*nword[1]).gcount())!=sizeof(UInt_32b)*nword[1]) //if file end before event end
-		return 1;
+	_sourceStream.read((char*)nword,sizeof(nword[0])*2);
+		
+	for (UInt_16b i = 0; i < nword[0] + nword[1]; i++) 
+	{
+		_sourceStream.read((char*)&word, sizeof(word));
+		_event.addRawData(word);
+	}
 
-	std::vector<std::vector<UInt_32b> > rawDataVector(2,std::vector<UInt_32b> (0,0));
+	if (_sourceStream.fail()) return 1;
 
-	for (int board_id=0;board_id<=1;board_id++)	for(int i=0;i<nword[board_id];i++)	
-		rawDataVector.at(board_id).push_back(data[board_id][i]);
-
-	_event.setRawData(rawDataVector);
 	return 0;
 }
 
@@ -220,13 +255,14 @@ std::ostream& E3Run::writeEventOut(std::ostream& os)
 	os << _event.getEvtNum()-1;
 
 
-
-	if (_event.trkNum==0)  // if no tracks are reconstructed,write it and return
+	E3Track bestTrack;
+	if (!_event.numTracks())  // if no tracks are reconstructed,write it and return
 	{
 		os.width(11);
 		os <<"no hits"<<std::endl;
 		return os;
 	}
+	else bestTrack=_event.bestTrack();
 
 
 	//seconds from 1.1.2007
@@ -246,24 +282,24 @@ std::ostream& E3Run::writeEventOut(std::ostream& os)
 
 	//cosine direction
 	os.width(10);	
-	os << std::setprecision(5)<<_event.cosx;
+	os << std::setprecision(5)<<bestTrack.xdir();
 	os.width(10);		
-	os << _event.cosy;
+	os << bestTrack.ydir();
 	os.width(10);		
-	os << _event.cosz;
+	os << bestTrack.zdir();
 
 	//chi2
 	os.width(9);	
 	int aux=0;
-	os << aux;
+	os << std::setprecision(3)<<bestTrack.chisquare();
 
 	//tof
 	os.width(11);	
-	os <<std::setprecision(3)<< aux;
+	os <<std::setprecision(3)<< bestTrack.timeOfFlight();
 
 	//track L
 	os.width(11);	
-	os <<std::setprecision(2)<< (double)_event.r<<std::endl;
+	os <<std::setprecision(2)<< (double)bestTrack.length()<<std::endl;
 		
 	return os;
 }
@@ -284,116 +320,116 @@ std::ostream& E3Run::writeRunSum(std::ostream& os)
 	os<<" ****** Hit analysis ***************"<<std::endl;
 	 os<<"Events with no hits in a chamber =";
 	os.width(13);
-	os << std::dec<<std::right<<_gLowMultiplicity<<std::endl;
+	os << std::dec<<std::right<<_gLowHitMult<<std::endl;
 	
 	 os<<" Events with 1 or 2 hits/chamber =";
 	os.width(13);
-	os << std::dec<<std::right<<_gMediumMultiplicity<<std::endl;
+	os << std::dec<<std::right<<_gMediumHitMult<<std::endl;
 	
 	 os<<" Event with more than 2 hits in a chamber =";
 	os.width(13);
-	os << std::dec<<std::right<<_gHighMultiplicity<<std::endl;
+	os << std::dec<<std::right<<_gHighHitMult<<std::endl;
 	
 	os<<" Hits multiplicity chamber BOTTOM"<<std::endl;
 	
-	for (int muxIdx = 0; muxIdx < _gMultiplicity.at(2).size(); muxIdx++)
-		if (_gMultiplicity.at(2).at(muxIdx) > 0)
+	for (int muxIdx = 0; muxIdx < _gHitMult.at(2).size(); muxIdx++)
+		if (_gHitMult.at(2).at(muxIdx) > 0)
 		{
 			os.width(12);
 			os <<std::right<<muxIdx;
 			os.width(12);
-			os <<std::right<<_gMultiplicity.at(2).at(muxIdx)<<std::endl;
+			os <<std::right<<_gHitMult.at(2).at(muxIdx)<<std::endl;
 		}
 	
 	os<<" Hits multiplicity chamber MIDDLE"<<std::endl;
 	
-	for (int muxIdx = 0; muxIdx < _gMultiplicity.at(1).size(); muxIdx++)
-		if (_gMultiplicity.at(1).at(muxIdx) > 0)
+	for (int muxIdx = 0; muxIdx < _gHitMult.at(1).size(); muxIdx++)
+		if (_gHitMult.at(1).at(muxIdx) > 0)
 		{
 			os.width(12);
 			os <<std::right<<muxIdx;
 			os.width(12);
-			os <<std::right<<_gMultiplicity.at(1).at(muxIdx)<<std::endl;
+			os <<std::right<<_gHitMult.at(1).at(muxIdx)<<std::endl;
 		}
 	
 	os<<" Hits multiplicity chamber UP"<<std::endl;
 	
-	for (int muxIdx = 0; muxIdx < _gMultiplicity.at(0).size(); muxIdx++)
-		if (_gMultiplicity.at(0).at(muxIdx) > 0)
+	for (int muxIdx = 0; muxIdx < _gHitMult.at(0).size(); muxIdx++)
+		if (_gHitMult.at(0).at(muxIdx) > 0)
 		{
 			os.width(12);
 			os <<std::right<<muxIdx;
 			os.width(12);
-			os <<std::right<<_gMultiplicity.at(0).at(muxIdx)<<std::endl;
+			os <<std::right<<_gHitMult.at(0).at(muxIdx)<<std::endl;
 		}
 	
 	os<<" Hits total multiplicity"<<std::endl;
 	
-	for (int muxIdx = 0; muxIdx < _gSumMultiplicity.size(); muxIdx++)
-		if (_gSumMultiplicity.at(muxIdx) > 0)
+	for (int muxIdx = 0; muxIdx < _gSumHitMult.size(); muxIdx++)
+		if (_gSumHitMult.at(muxIdx) > 0)
 		{
 			os.width(12);
 			os <<std::right<<muxIdx;
 			os.width(12);
-			os <<std::right<<_gSumMultiplicity.at(muxIdx)<<std::endl;
+			os <<std::right<<_gSumHitMult.at(muxIdx)<<std::endl;
 		}
 //cluster info (to be adjusted)
 		
 	os<<" ******** Cluster analysis ************"<<std::endl;
 	os<<" Events with 1 cluster in each chamber =";
 	os.width(13);
-	os << std::dec<<std::right<<_gLowMultiplicity<<std::endl;
+	os << std::dec<<std::right<<_gLowClusterMult<<std::endl;
 	
 	 os<<" Events with >=2 clusters in a chamber =";
 	os.width(13);
-	os << std::dec<<std::right<<_gMediumMultiplicity<<std::endl;
+	os << std::dec<<std::right<<_gHighClusterMult<<std::endl;
 	
 	 os<<" Events with 2 clusters  in each chamber =";
 	os.width(13);
-	os << std::dec<<std::right<<_gHighMultiplicity<<std::endl;
+	os << std::dec<<std::right<<_gMediumClusterMult<<std::endl;
 
 	os<<" Cluster multiplicity chamber BOTTOM"<<std::endl;
 
-	for (int muxIdx = 0; muxIdx < _gMultiplicity.at(2).size(); muxIdx++)
-		if (_gMultiplicity.at(2).at(muxIdx) > 0)
+	for (int muxIdx = 0; muxIdx < _gClusterMult.at(2).size(); muxIdx++)
+		if (_gClusterMult.at(2).at(muxIdx) > 0)
 		{
 			os.width(12);
 			os <<std::right<<muxIdx;
 			os.width(12);
-			os <<std::right<<_gMultiplicity.at(2).at(muxIdx)<<std::endl;
+			os <<std::right<<_gClusterMult.at(2).at(muxIdx)<<std::endl;
 		}
 
 	os<<" Cluster multiplicity chamber MIDDLE"<<std::endl;
 
-	for (int muxIdx = 0; muxIdx < _gMultiplicity.at(1).size(); muxIdx++)
-		if (_gMultiplicity.at(1).at(muxIdx) > 0)
+	for (int muxIdx = 0; muxIdx < _gClusterMult.at(1).size(); muxIdx++)
+		if (_gClusterMult.at(1).at(muxIdx) > 0)
 		{
 			os.width(12);
 			os <<std::right<<muxIdx;
 			os.width(12);
-			os <<std::right<<_gMultiplicity.at(1).at(muxIdx)<<std::endl;
+			os <<std::right<<_gClusterMult.at(1).at(muxIdx)<<std::endl;
 		}
 
 	os<<" Cluster multiplicity chamber UP"<<std::endl;
 
-	for (int muxIdx = 0; muxIdx < _gMultiplicity.at(0).size(); muxIdx++)
-		if (_gMultiplicity.at(0).at(muxIdx) > 0)
+	for (int muxIdx = 0; muxIdx < _gClusterMult.at(0).size(); muxIdx++)
+		if (_gClusterMult.at(0).at(muxIdx) > 0)
 		{
 			os.width(12);
 			os <<std::right<<muxIdx;
 			os.width(12);
-			os <<std::right<<_gMultiplicity.at(0).at(muxIdx)<<std::endl;
+			os <<std::right<<_gClusterMult.at(0).at(muxIdx)<<std::endl;
 		}
 
 	os<<" Cluster total multiplicity"<<std::endl;
 
-	for (int muxIdx = 0; muxIdx < _gSumMultiplicity.size(); muxIdx++)
-		if (_gSumMultiplicity.at(muxIdx) > 0)
+	for (int muxIdx = 0; muxIdx < _gSumClusterMult.size(); muxIdx++)
+		if (_gSumClusterMult.at(muxIdx) > 0)
 		{
 			os.width(12);
 			os <<std::right<<muxIdx;
 			os.width(12);
-			os <<std::right<<_gSumMultiplicity.at(muxIdx)<<std::endl;
+			os <<std::right<<_gSumClusterMult.at(muxIdx)<<std::endl;
 		}
 
 		//other

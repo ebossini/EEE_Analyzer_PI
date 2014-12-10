@@ -13,6 +13,8 @@
 #define Int_16b		int16_t
 #define Int_8b		int8_t
 
-
+#define kTopPlane  0
+#define kMidPlane  1
+#define kBotPlane  2
 
 #endif
