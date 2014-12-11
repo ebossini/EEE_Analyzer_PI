@@ -8,6 +8,7 @@ Questo file contiene un riepilogo del contenuto di ciascun file che fa parte
 dell'applicazione EEEAnalyzer.
 
 
+
 EEEAnalyzer.vcxproj
     File di progetto principale per i progetti VC++ generati tramite una creazione guidata applicazione. Contiene informazioni sulla versione di Visual C++ che ha generato il file e informazioni sulle piattaforme, le configurazioni e le caratteristiche del progetto selezionate con la Creazione guidata applicazione.
 
